@@ -11,7 +11,26 @@ class Hello(resource.Resource):
         return resource.Resource.getChild(self, name, request)
 
     def render_GET(self, request):
-        return "<html><body>Welcome to Twisted SSE</body></html>"
+        with open('sse-demo.html', 'r') as f:
+            return f.read()
+        return r"""
+        <html>
+            <head>
+                <script language="JavaScript">
+                        eventSource = new EventSource("http://localhost:12000/subscribe");
+                        eventSource.onmessage = function(event) {
+                            element = document.getElementById("event-data");
+                            element.innerHTML = event.data;
+                        };
+                    </script>
+            </head>
+            <body>
+                <h1> Welcome to the SSE demo </h1>
+                <h3> Event data: </h3>
+                <p id="event-data"></p>
+            </body>
+        </html>
+        """
 
 class Subscribe(resource.Resource):
     isLeaf = True
