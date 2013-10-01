@@ -4,15 +4,17 @@ from twisted.web import server, resource
 from twisted.internet import reactor
 from twisted.python import log
 
-class Hello(resource.Resource):
+
+class Root(resource.Resource):
+    """
+    Root resource; serves JavaScript
+    """
     def getChild(self, name, request):
         if name == '':
             return self
         return resource.Resource.getChild(self, name, request)
 
     def render_GET(self, request):
-        with open('sse-demo.html', 'r') as f:
-            return f.read()
         return r"""
         <html>
             <head>
@@ -32,7 +34,11 @@ class Hello(resource.Resource):
         </html>
         """
 
+
 class Subscribe(resource.Resource):
+    """
+    Implements the subscribe resource
+    """
     isLeaf = True
 
     def __init__(self):
@@ -46,9 +52,6 @@ class Subscribe(resource.Resource):
         d.addBoth(self.removeSubscriber)
         log.msg("Adding subscriber...")
         request.write("")
-        #return "<html>Hello, world!</html>"
-        #request.write("data: hello world\r\n")
-        #request.finish()
         return server.NOT_DONE_YET
 
     def publishToAll(self, data):
@@ -61,7 +64,11 @@ class Subscribe(resource.Resource):
             log.msg("Removing subscriber..")
             self.subscribers.remove(subscriber)
 
+
 class Publish(resource.Resource):
+    """
+    Implements the publish resource
+    """
     isLeaf = True
 
     def __init__(self, subscriber):
@@ -75,7 +82,8 @@ class Publish(resource.Resource):
         self.subscriber.publishToAll(data)
         return 'Thank you for publishing data %s\n' % data
 
-root = Hello()
+
+root = Root()
 subscribe = Subscribe()
 root.putChild('subscribe', subscribe)
 root.putChild('publish', Publish(subscribe))
