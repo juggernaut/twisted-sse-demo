@@ -56,8 +56,10 @@ class Subscribe(resource.Resource):
 
     def publishToAll(self, data):
         for subscriber in self.subscribers:
-            # NOTE: the second CRLF is required to dispatch the event at the client
-            subscriber.write("data: %s\r\n\r\n" % data)
+            for line in data:
+                subscriber.write("data: %s\r\n" % line)
+            # NOTE: the last CRLF is required to dispatch the event at the client
+            subscriber.write("\r\n")
 
     def removeSubscriber(self, subscriber):
         if subscriber in self.subscribers:
@@ -78,9 +80,9 @@ class Publish(resource.Resource):
         if 'data' not in request.args:
             request.setResponseCode(400)
             return "The parameter 'data' must be set\n"
-        data = request.args.get('data')[0]
+        data = request.args.get('data')
         self.subscriber.publishToAll(data)
-        return 'Thank you for publishing data %s\n' % data
+        return 'Thank you for publishing data %s\n' % '\n'.join(data)
 
 
 root = Root()
