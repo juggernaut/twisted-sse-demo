@@ -9,33 +9,63 @@ EVENTSOURCE_URL = 'http://localhost:12000/subscribe'
 class EventSourceProtocol(LineReceiver):
     def __init__(self, finished):
         self.finished = finished
-        self.buffer = ''
+        # Initialize the event and data buffers
+        self.event = 'message'
+        self.data = ''
 
     def lineReceived(self, line):
-        print 'Received line %s!' % line
         if line == '':
             # Dispatch event
-            print "received event with payload %s" % self.buffer
-            self.buffer = ''
+            self.dispatchEvent()
         else:
             try:
-                event, payload = line.split(':', 1)
+                field, value = line.split(':', 1)
+                # If value starts with a space, strip it.
+                value = lstrip(value)
             except ValueError:
-                print 'protocol violation'
-                self.finished.errback('protocol violation')
+                # We got a line with no colon, treat it as a field(ignore)
                 return
 
-            print 'buffering data!'
-            self.buffer += payload
+            if field == '':
+                # This is a comment; ignore
+                pass
+            elif field == 'data':
+                self.data += value + '\n'
+            elif field == 'event':
+                self.event = value
+            elif field == 'id':
+                # Not implemented
+                pass
+            elif field == 'retry':
+                # Not implemented
+                pass
 
     def connectionLost(self, reason):
         self.finished.callback(None)
+
+    def dispatchEvent(self):
+        """
+        Dispatch the event
+        """
+        # If last character is LF, strip it.
+        if self.data.endswith('\n'):
+            self.data = self.data[:-1]
+        print "received event with payload %s and event type %s" % (self.data, self.event)
+        self.data = ''
+        self.event = 'message'
+
+def lstrip(value):
+    return value[1:] if value.startswith(' ') else value
 
 agent = Agent(reactor)
 d = agent.request(
     'GET',
     EVENTSOURCE_URL,
-    Headers({'User-Agent': ['Twisted Web Client Example']}),
+    Headers({
+        'User-Agent': ['Twisted Web Client Example'],
+        'Cache-Control': ['no-cache'],
+        'Accept': ['text/event-stream; charset=utf-8'],
+    }),
     None)
 
 def cbRequest(response):
