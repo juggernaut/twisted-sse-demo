@@ -1,17 +1,19 @@
-from twisted.internet import reactor
-from twisted.internet.defer import Deferred
 from twisted.protocols.basic import LineReceiver
-from twisted.web.client import Agent
-from twisted.web.http_headers import Headers
 
-EVENTSOURCE_URL = 'http://localhost:12000/subscribe'
 
 class EventSourceProtocol(LineReceiver):
-    def __init__(self, finished):
-        self.finished = finished
+    def __init__(self):
+        self.callbacks = {}
+        self.finished = None
         # Initialize the event and data buffers
         self.event = 'message'
         self.data = ''
+
+    def setFinishedDeferred(self, d):
+        self.finished = d
+
+    def addCallback(self, event, func):
+        self.callbacks[event] = func
 
     def lineReceived(self, line):
         if line == '':
@@ -41,7 +43,8 @@ class EventSourceProtocol(LineReceiver):
                 pass
 
     def connectionLost(self, reason):
-        self.finished.callback(None)
+        if self.finished:
+            self.finished.callback(None)
 
     def dispatchEvent(self):
         """
@@ -50,36 +53,10 @@ class EventSourceProtocol(LineReceiver):
         # If last character is LF, strip it.
         if self.data.endswith('\n'):
             self.data = self.data[:-1]
-        print "received event with payload %s and event type %s" % (self.data, self.event)
+        if self.event in self.callbacks:
+            self.callbacks[self.event](self.data)
         self.data = ''
         self.event = 'message'
 
 def lstrip(value):
     return value[1:] if value.startswith(' ') else value
-
-agent = Agent(reactor)
-d = agent.request(
-    'GET',
-    EVENTSOURCE_URL,
-    Headers({
-        'User-Agent': ['Twisted Web Client Example'],
-        'Cache-Control': ['no-cache'],
-        'Accept': ['text/event-stream; charset=utf-8'],
-    }),
-    None)
-
-def cbRequest(response):
-    print 'Response version:', response.version
-    print 'Response code:', response.code
-    print 'Response phrase:', response.phrase
-    print 'Response headers:'
-    finished = Deferred()
-    response.deliverBody(EventSourceProtocol(finished))
-    return finished
-d.addCallback(cbRequest)
-
-def cbShutdown(ignored):
-    reactor.stop()
-d.addBoth(cbShutdown)
-
-reactor.run()
