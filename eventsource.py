@@ -1,3 +1,5 @@
+from threading import Thread
+
 from sse_client import EventSourceProtocol
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
@@ -17,13 +19,12 @@ class EventSource(object):
         """
         Connect to the event source URL
         """
-        print 'connecting....'
         agent = Agent(reactor)
         d = agent.request(
             'GET',
             self.url,
             Headers({
-                'User-Agent': ['Twisted Web Client Example'],
+                'User-Agent': ['Twisted SSE Client'],
                 'Cache-Control': ['no-cache'],
                 'Accept': ['text/event-stream; charset=utf-8'],
             }),
@@ -32,17 +33,14 @@ class EventSource(object):
         d.addBoth(self.cbShutdown)
 
     def cbRequest(self, response):
-        print 'Response version:', response.version
-        print 'Response code:', response.code
-        print 'Response phrase:', response.phrase
-        print 'Response headers:'
         finished = Deferred()
         self.protocol.setFinishedDeferred(finished)
         response.deliverBody(self.protocol)
         return finished
 
     def cbShutdown(self, ignored):
-        reactor.stop()
+        if reactor.running:
+            reactor.stop()
 
     def onmessage(self, func):
         self.protocol.addCallback('message', func)
@@ -50,11 +48,9 @@ class EventSource(object):
     def addEventListener(self, event, func):
         self.protocol.addCallback(event, func)
 
-def onmessage(data):
-    print 'Got payload with data %s' % data
+    def start(self):
+        # Fire up the reactor in another thread.
+        Thread(target=reactor.run, args=(False,)).start()
 
-if __name__ == '__main__':
-    EVENTSOURCE_URL = 'http://localhost:12000/subscribe'
-    eventSource = EventSource(EVENTSOURCE_URL)
-    eventSource.onmessage(onmessage)
-    reactor.run()
+    def stop(self):
+        reactor.callFromThread(self.cbShutdown, None)
