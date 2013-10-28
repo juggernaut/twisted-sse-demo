@@ -42,11 +42,14 @@ class EventSource(object):
         if reactor.running:
             reactor.stop()
 
-    def onmessage(self, func):
-        self.protocol.addCallback('message', func)
+    def onmessage(self, func, callInThread=False):
+        self.addEventListener('message', func, callInThread)
 
-    def addEventListener(self, event, func):
-        self.protocol.addCallback(event, func)
+    def addEventListener(self, event, func, callInThread=False):
+        callback = func
+        if callInThread:
+            callback = lambda data: reactor.callInThread(func, data)
+        self.protocol.addCallback(event, callback)
 
     def start(self):
         # Fire up the reactor in another thread.
