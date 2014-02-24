@@ -17,6 +17,7 @@ class EventSource(object):
         self.url = url
         self.protocol = EventSourceProtocol()
         self.errorHandler = None
+        self.stashedError = None
         self.connect()
 
     @run_in_reactor
@@ -57,9 +58,13 @@ class EventSource(object):
                 reactor.callInThread(func, msg)
             else:
                 func(msg)
+        else:
+            self.stashedError = msg
 
     def onerror(self, func, callInThread=False):
         self.errorHandler = func, callInThread
+        if self.stashedError:
+            self.callErrorHandler(self.stashedError)
 
     def onmessage(self, func, callInThread=False):
         self.addEventListener('message', func, callInThread)
