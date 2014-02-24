@@ -36,7 +36,6 @@ class EventSource(object):
             None)
         d.addErrback(self.connectError)
         d.addCallback(self.cbRequest)
-        d.addBoth(self.cbShutdown)
 
     def cbRequest(self, response):
         if response.code != 200:
@@ -50,11 +49,6 @@ class EventSource(object):
 
     def connectError(self, ignored):
         self.callErrorHandler("error connecting to endpoint: %s" % self.url)
-        self.cbShutdown(None)
-
-    def cbShutdown(self, ignored):
-        if reactor.running:
-            reactor.stop()
 
     def callErrorHandler(self, msg):
         if self.errorHandler:
