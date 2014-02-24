@@ -8,6 +8,7 @@ from sse_client import EventSourceProtocol
 
 setup()
 
+
 class EventSource(object):
     """
     The main EventSource class
@@ -39,7 +40,8 @@ class EventSource(object):
 
     def cbRequest(self, response):
         if response.code != 200:
-            self.callErrorHandler("non 200 response received: %d" % response.code)
+            self.callErrorHandler("non 200 response received: %d" %
+                                  response.code)
         else:
             finished = Deferred()
             self.protocol.setFinishedDeferred(finished)
