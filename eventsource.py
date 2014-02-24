@@ -1,10 +1,12 @@
-from threading import Thread
-
-from sse_client import EventSourceProtocol
+from crochet import setup, run_in_reactor
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
+
+from sse_client import EventSourceProtocol
+
+setup()
 
 class EventSource(object):
     """
@@ -13,8 +15,10 @@ class EventSource(object):
     def __init__(self, url):
         self.url = url
         self.protocol = EventSourceProtocol()
+        self.errorHandler = None
         self.connect()
 
+    @run_in_reactor
     def connect(self):
         """
         Connect to the event source URL
@@ -29,18 +33,37 @@ class EventSource(object):
                 'Accept': ['text/event-stream; charset=utf-8'],
             }),
             None)
+        d.addErrback(self.connectError)
         d.addCallback(self.cbRequest)
         d.addBoth(self.cbShutdown)
 
     def cbRequest(self, response):
-        finished = Deferred()
-        self.protocol.setFinishedDeferred(finished)
-        response.deliverBody(self.protocol)
-        return finished
+        if response.code != 200:
+            self.callErrorHandler("non 200 response received: %d" % response.code)
+        else:
+            finished = Deferred()
+            self.protocol.setFinishedDeferred(finished)
+            response.deliverBody(self.protocol)
+            return finished
+
+    def connectError(self, ignored):
+        self.callErrorHandler("error connecting to endpoint: %s" % self.url)
+        self.cbShutdown(None)
 
     def cbShutdown(self, ignored):
         if reactor.running:
             reactor.stop()
+
+    def callErrorHandler(self, msg):
+        if self.errorHandler:
+            func, callInThread = self.errorHandler
+            if callInThread:
+                reactor.callInThread(func, msg)
+            else:
+                func(msg)
+
+    def onerror(self, func, callInThread=False):
+        self.errorHandler = func, callInThread
 
     def onmessage(self, func, callInThread=False):
         self.addEventListener('message', func, callInThread)
@@ -50,10 +73,3 @@ class EventSource(object):
         if callInThread:
             callback = lambda data: reactor.callInThread(func, data)
         self.protocol.addCallback(event, callback)
-
-    def start(self):
-        # Fire up the reactor in another thread.
-        Thread(target=reactor.run, args=(False,)).start()
-
-    def stop(self):
-        reactor.callFromThread(self.cbShutdown, None)

@@ -10,6 +10,4 @@ def onmessage(data):
 if __name__ == '__main__':
     eventSource = EventSource(EVENTSOURCE_URL)
     eventSource.onmessage(onmessage, callInThread=True)
-    eventSource.start()
     time.sleep(20)
-    eventSource.stop()
