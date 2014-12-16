@@ -11,6 +11,6 @@ Open up http://localhost:12000 in your browser.
 
 To publish events:
 
-    curl -d 'data=Hello!' http://localhost:1200/publish
+    curl -d 'data=Hello!' http://localhost:12000/publish
     
 You should see the data you publish in your browser. That's it!
